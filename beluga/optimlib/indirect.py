@@ -125,8 +125,8 @@ def ocp_to_bvp(ocp, **kwargs):
         num_dae = 0
     elif control_method == 'icrm':
         dae_states, dae_rates, dae_bc, temp_dgdX, temp_dgdU = make_control_dae(states, costates, states_rates,
-                                                                                   costates_rates, controls, dHdu,
-                                                                                   derivative_fn)
+                                                                               costates_rates, controls, dHdu,
+                                                                               derivative_fn)
         dae_units = controls_units
         controls = []
         control_law = []
@@ -144,7 +144,6 @@ def ocp_to_bvp(ocp, **kwargs):
     nondynamical_parameters = initial_lm_params + terminal_lm_params
     nondynamical_parameters_units = initial_lm_params_units + terminal_lm_params_units
     # breakpoint()
-
 
     out = {'method': 'brysonho',
            'problem_name': problem_name,

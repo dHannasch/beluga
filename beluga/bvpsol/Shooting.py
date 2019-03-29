@@ -86,6 +86,8 @@ class Shooting(BaseAlgorithm):
         if self.boundarycondition_function is not None:
             self.bc_func_ms = self._bc_func_multiple_shooting(bc_func=self.boundarycondition_function)
 
+        self.stm_ode_func = None
+
     @staticmethod
     def _wrap_y0(gamma_set, parameters, nondynamical_parameters):
         n_odes = len(gamma_set[0].y[0])
@@ -136,7 +138,8 @@ class Shooting(BaseAlgorithm):
             u0g[ii] = _u0g
 
         def preload(args):
-            return prop(derivative_function, quadrature_function, args[0], args[1], args[2], args[3], paramGuess, sol.const)
+            return prop(derivative_function, quadrature_function, args[0], args[1], args[2], args[3],
+                        paramGuess, sol.const)
 
         if pool is not None:
             gamma_set_new = pool.map(preload, zip(tspan, y0g, q0g))
@@ -163,7 +166,8 @@ class Shooting(BaseAlgorithm):
             q0g[ii] = _q0g
 
         def preload(args):
-            return prop(pickle.loads(derivative_function), pickle.loads(quadrature_function), args[0], args[1], args[2], paramGuess, sol.const)
+            return prop(pickle.loads(derivative_function), pickle.loads(quadrature_function), args[0], args[1], args[2],
+                        paramGuess, sol.const)
 
         if pool is not None:
             gamma_set_new = pool.map(preload, zip(tspan, y0g, q0g))
@@ -277,7 +281,7 @@ class Shooting(BaseAlgorithm):
     def make_stmode(odefn, nOdes, StepSize=1e-6):
         Xh = np.eye(nOdes)*StepSize
 
-        def _stmode_fd(t, _X, p, aux):
+        def _stmode_fd(_X, u, p, aux):
             """ Finite difference version of state transition matrix """
             nParams = p.size
             F = np.empty((nOdes, nOdes+nParams))
@@ -285,19 +289,20 @@ class Shooting(BaseAlgorithm):
             X = _X[0:nOdes]  # Just states
 
             # Compute Jacobian matrix, F using finite difference
-            fx = np.squeeze([odefn(t, X, p, aux)])
+            fx = np.squeeze([odefn(X, u, p, aux)])
 
             for i in range(nOdes):
-                fxh = odefn(t, X + Xh[i, :], p, aux)
+                fxh = odefn(X + Xh[i, :], u, p, aux)
                 F[:, i] = (fxh-fx) / StepSize
 
             for i in range(nParams):
                 p[i] += StepSize
-                fxh = odefn(t, X, p, aux)
+                fxh = odefn(X, u, p, aux)
                 F[:, i+nOdes] = (fxh - fx) / StepSize
                 p[i] -= StepSize
 
-            phiDot = np.dot(np.vstack((F, np.zeros((nParams, nParams + nOdes)))), np.vstack((phi, np.hstack((np.zeros((nParams, nOdes)), np.eye(nParams))))))[:nOdes, :]
+            phiDot = np.dot(np.vstack((F, np.zeros((nParams, nParams + nOdes)))),
+                            np.vstack((phi, np.hstack((np.zeros((nParams, nOdes)), np.eye(nParams))))))[:nOdes, :]
             return np.hstack((fx, np.reshape(phiDot, (nOdes * (nOdes + nParams)))))
 
         return _stmode_fd
@@ -374,8 +379,8 @@ class Shooting(BaseAlgorithm):
         # Set up the initial guess vector
         Xinit = self._wrap_y0(gamma_set, parameter_guess, nondynamical_parameter_guess)
 
-        def quad_wrap(t,X,p,aux):
-            return self.quadrature_function(t, X[:n_odes],p,aux)
+        def quad_wrap(t, X, p, aux):
+            return self.quadrature_function(t, X[:n_odes], p, aux)
 
         # Pickle the functions for faster execution
         if pool is not None:
@@ -446,9 +451,9 @@ class Shooting(BaseAlgorithm):
                 phi_temp = np.reshape(temp[:, n_odes:], (len(gamma_set_new[ii].t), n_odes, n_odes + n_dynparams))
                 phi_full_list.append(np.copy(phi_temp))
 
-            J = self._bc_jac_multi(gamma_set_new, phi_full_list, _params, _nonparams, sol.const, self.quadrature_function,
-                                   self.bc_func_ms, StepSize=1e-6)
-            return J
+            jac = self._bc_jac_multi(gamma_set_new, phi_full_list, _params, _nonparams, sol.const,
+                                     self.quadrature_function, self.bc_func_ms, StepSize=1e-6)
+            return jac
 
         def _jacobian_function_wrapper(X):
             return _jacobian_function(X, pick_stm, pick_quad_stm, n_odes, n_quads, n_dynparams, self.num_arcs)
@@ -456,8 +461,8 @@ class Shooting(BaseAlgorithm):
         # TODO: Sean if your reading this, the following numerical jacobian function seems to work well.
         # It causes an error on one of the test cases, however, and I haven't had time to debug specifically what
         # is happening here. This is slower, but is more stable.
-        def _jacobian_function_wrapper(X):
-            return approx_jacobian(X, _constraint_function_wrapper, 1e-6)
+        # def _jacobian_function_wrapper(X):
+        #     return approx_jacobian(X, _constraint_function_wrapper, 1e-6)
         constraint = {'type': 'eq', 'fun': _constraint_function_wrapper, 'jac': _jacobian_function_wrapper}
 
         # Set up the cost function. This should just return 0 unless the specified method cannot handle constraints

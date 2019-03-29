@@ -67,22 +67,24 @@ ocp.constant('phi_f', 0, 'rad')
 
 ocp.scale(m='h', s='h/v', kg='mass', rad=1)
 
-bvp_solver = beluga.bvp_algorithm('Shooting',
-                                  derivative_method='fd',
-                                  tolerance=1e-4,
-                                  max_iterations=100,
-                                  max_error=400,
-                                  algorithm='SLSQP'
-                                  )
+bvp_solver = beluga.bvp_algorithm(
+    'Shooting',
+    derivative_method='fd',
+    tolerance=1e-4,
+    max_iterations=100,
+    max_error=400,
+    algorithm='armijo'
+)
 
-guess_maker = beluga.guess_generator('auto',
-                                     start=[40000, 0, 0, 2000, -(90-10)*pi/180, 0],
-                                     direction='forward',
-                                     costate_guess=-0.1,
-                                     control_guess=[0.0, 0.0],
-                                     use_control_guess=True,
-                                     time_integrate=0.5,
-                                     )
+guess_maker = beluga.guess_generator(
+    'auto',
+    start=[40000, 0, 0, 2000, -(90-10)*pi/180, 0],
+    direction='forward',
+    costate_guess=-0.1,
+    control_guess=[0.0, 0.0],
+    use_control_guess=True,
+    time_integrate=0.5,
+)
 
 
 continuation_steps = beluga.init_continuation()
@@ -101,10 +103,13 @@ continuation_steps.add_step('bisection').num_cases(41) \
 continuation_steps.add_step('bisection').num_cases(41) \
     .const('phi_f', 2*pi/180)
 
-beluga.add_logger(logging_level=logging.DEBUG)
+beluga.add_logger(logging_level=logging.DEBUG, display_level=logging.DEBUG)
 
-sol_set = beluga.solve(ocp=ocp,
-             method='indirect',
-             bvp_algorithm=bvp_solver,
-             steps=continuation_steps,
-             guess_generator=guess_maker)
+sol_set = beluga.solve(
+    ocp=ocp,
+    method='indirect',
+    control_method='icrm',
+    bvp_algorithm=bvp_solver,
+    steps=continuation_steps,
+    guess_generator=guess_maker
+)
