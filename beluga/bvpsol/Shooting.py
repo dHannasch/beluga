@@ -410,6 +410,9 @@ class Shooting(BaseAlgorithm):
         def _constraint_function_wrapper(X):
             return _constraint_function(X, pick_deriv, pick_quad, n_odes, n_quads, n_dynparams, self.num_arcs, sol.const)
 
+        stm0 = np.hstack((np.eye(n_odes), np.zeros((n_odes, n_dynparams)))).reshape(n_odes * (n_odes + n_dynparams))
+        y0stm = np.zeros((len(stm0) + n_odes))
+
         # Set up the jacobian of the constraint function
         def _jacobian_function(X, deriv_func, quad_func, n_odes, n_quads, n_dynparams, n_arcs):
             g = copy.deepcopy(gamma_set)
@@ -425,9 +428,7 @@ class Shooting(BaseAlgorithm):
                 _y0g, _q0g, _u0g = g[ii](t0)
                 tf = g[ii].t[-1]
                 _yfg, _qfg, _ufg = g[ii](tf)
-                stm0 = np.hstack((np.eye(n_odes), np.zeros((n_odes, n_dynparams)))).reshape(
-                    n_odes * (n_odes + n_dynparams))
-                y0stm = np.zeros((len(stm0) + n_odes))
+
                 stmf = np.hstack((np.eye(n_odes), np.zeros((n_odes, n_dynparams)))).reshape(
                     n_odes * (n_odes + n_dynparams))
                 yfstm = np.zeros((len(stmf) + n_odes))
@@ -452,7 +453,7 @@ class Shooting(BaseAlgorithm):
                 phi_full_list.append(np.copy(phi_temp))
 
             jac = self._bc_jac_multi(gamma_set_new, phi_full_list, _params, _nonparams, sol.const,
-                                     self.quadrature_function, self.bc_func_ms, StepSize=1e-6)
+                                     self.quadrature_function, self.bc_func_ms)
             return jac
 
         def _jacobian_function_wrapper(X):
@@ -476,7 +477,8 @@ class Shooting(BaseAlgorithm):
                 def cost(x):
                     return np.linalg.norm(_constraint_function_wrapper(x)) ** 2
 
-            opt = minimize(cost, Xinit, method=self.algorithm, tol=self.tolerance, constraints=[constraint], options={'maxiter': self.max_iterations})
+            opt = minimize(cost, Xinit, method=self.algorithm, tol=self.tolerance, constraints=[constraint],
+                           options={'maxiter': self.max_iterations})
             Xinit = opt.x
             n_iter = opt.nit
             converged = opt.success and isclose(opt.fun, 0, abs_tol=self.tolerance)

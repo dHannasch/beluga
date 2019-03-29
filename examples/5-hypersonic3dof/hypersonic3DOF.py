@@ -73,7 +73,8 @@ bvp_solver = beluga.bvp_algorithm(
     tolerance=1e-4,
     max_iterations=100,
     max_error=400,
-    algorithm='armijo'
+    algorithm='armijo',
+    num_arcs=4,
 )
 
 guess_maker = beluga.guess_generator(
